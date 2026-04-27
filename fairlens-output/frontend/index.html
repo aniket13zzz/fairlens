@@ -1,0 +1,832 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FairLens AI — Know Before You Deploy</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Instrument+Serif:ital@0;1&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #05070f;
+    --surface: #0c0f1a;
+    --surface2: #111520;
+    --surface3: #171c2e;
+    --border: rgba(255,255,255,0.07);
+    --border-strong: rgba(255,255,255,0.14);
+    --green: #00e676;
+    --green-bright: #69ff9c;
+    --green-dim: rgba(0,230,118,0.12);
+    --green-glow: rgba(0,230,118,0.25);
+    --red: #ff3366;
+    --red-dim: rgba(255,51,102,0.12);
+    --yellow: #ffcc02;
+    --yellow-dim: rgba(255,204,2,0.12);
+    --orange: #ff6b35;
+    --blue: #4f8aff;
+    --blue-dim: rgba(79,138,255,0.12);
+    --purple: #9d6fff;
+    --text: #e2e8f8;
+    --text-dim: #5a6178;
+    --text-mid: #8892aa;
+    --mono: 'JetBrains Mono', monospace;
+    --serif: 'Instrument Serif', serif;
+    --sans: 'DM Sans', sans-serif;
+    --radius: 14px;
+    --radius-sm: 8px;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:var(--bg); color:var(--text); font-family:var(--sans); min-height:100vh; overflow-x:hidden; font-size:15px; }
+  body::before { content:''; position:fixed; inset:0; z-index:0; background-image:linear-gradient(rgba(0,230,118,0.025) 1px,transparent 1px),linear-gradient(90deg,rgba(0,230,118,0.025) 1px,transparent 1px); background-size:48px 48px; pointer-events:none; }
+
+  nav { position:fixed; top:0; left:0; right:0; z-index:100; background:rgba(5,7,15,0.9); backdrop-filter:blur(24px); border-bottom:1px solid var(--border); padding:0 2rem; height:60px; display:flex; align-items:center; justify-content:space-between; }
+  .logo { font-family:var(--mono); font-size:1rem; font-weight:700; color:var(--green); display:flex; align-items:center; gap:.7rem; }
+  .logo-icon { width:32px; height:32px; background:var(--green-dim); border:1px solid var(--green-glow); border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:14px; }
+  .nav-pills { display:flex; align-items:center; gap:.5rem; }
+  .nav-pill { font-family:var(--mono); font-size:.65rem; color:var(--text-dim); border:1px solid var(--border); padding:4px 10px; border-radius:100px; }
+  .nav-pill.live { color:var(--green); border-color:var(--green-glow); background:var(--green-dim); }
+  .nav-pill.live::before { content:'● '; animation:blink 1.5s ease-in-out infinite; }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+  .step-bar { position:fixed; top:60px; left:0; right:0; z-index:99; background:rgba(5,7,15,0.92); backdrop-filter:blur(16px); border-bottom:1px solid var(--border); padding:0 2rem; height:44px; display:flex; align-items:center; justify-content:center; gap:0; }
+  .step-item { display:flex; align-items:center; gap:.5rem; font-family:var(--mono); font-size:.65rem; color:var(--text-dim); letter-spacing:.05em; padding:0 .8rem; transition:all .3s; }
+  .step-item.active { color:var(--green); }
+  .step-item.done { color:var(--text-mid); }
+  .step-num { width:20px; height:20px; border:1px solid currentColor; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:.6rem; flex-shrink:0; }
+  .step-item.active .step-num { background:var(--green); color:var(--bg); border-color:var(--green); box-shadow:0 0 12px var(--green-glow); }
+  .step-divider { width:28px; height:1px; background:var(--border); flex-shrink:0; }
+
+  main { padding-top:104px; position:relative; z-index:1; padding-bottom:4rem; }
+
+  .hero { text-align:center; padding:56px 2rem 48px; max-width:860px; margin:0 auto; }
+  .hero-badge { display:inline-flex; align-items:center; gap:.5rem; background:var(--green-dim); border:1px solid var(--green-glow); color:var(--green); font-family:var(--mono); font-size:.65rem; padding:5px 14px; border-radius:100px; margin-bottom:1.5rem; letter-spacing:.08em; animation:fadeUp .6s ease both; }
+  .hero h1 { font-family:var(--serif); font-size:clamp(2.8rem,6vw,5rem); font-weight:400; line-height:1.08; letter-spacing:-.01em; margin-bottom:1rem; animation:fadeUp .7s ease both .1s; font-style:italic; }
+  .hero h1 em { font-style:normal; background:linear-gradient(135deg,var(--green),var(--green-bright)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
+  .hero p { font-size:1.05rem; color:var(--text-mid); max-width:520px; margin:0 auto 2rem; line-height:1.75; animation:fadeUp .7s ease both .2s; font-weight:300; }
+  @keyframes fadeUp { from{opacity:0;transform:translateY(24px)} to{opacity:1;transform:translateY(0)} }
+
+  .stat-row { display:flex; justify-content:center; gap:2rem; margin-bottom:3rem; animation:fadeUp .7s ease both .3s; flex-wrap:wrap; }
+  .stat-num { font-family:var(--mono); font-size:1.5rem; font-weight:700; color:var(--green); line-height:1; }
+  .stat-label { font-size:.72rem; color:var(--text-dim); margin-top:3px; letter-spacing:.05em; }
+
+  .container { max-width:960px; margin:0 auto; padding:0 1.5rem; }
+
+  .panel { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); margin-bottom:1.5rem; overflow:hidden; animation:fadeUp .5s ease both; }
+  .panel.hidden { display:none; }
+  .panel-header { padding:1rem 1.5rem; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:.8rem; }
+  .panel-num { width:26px; height:26px; background:var(--green-dim); border:1px solid var(--green-glow); color:var(--green); font-family:var(--mono); font-size:.7rem; border-radius:50%; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .panel-title { font-size:.9rem; font-weight:600; letter-spacing:-.01em; }
+  .panel-meta { margin-left:auto; font-family:var(--mono); font-size:.65rem; color:var(--text-dim); }
+  .panel-body { padding:1.5rem; }
+
+  .upload-zone { border:2px dashed rgba(0,230,118,0.2); border-radius:var(--radius); padding:3.5rem 2rem; text-align:center; cursor:pointer; transition:all .25s; background:rgba(0,230,118,0.02); position:relative; }
+  .upload-zone:hover,.upload-zone.dragover { border-color:var(--green); background:var(--green-dim); }
+  .upload-zone input[type=file] { position:absolute; inset:0; opacity:0; cursor:pointer; width:100%; height:100%; }
+  .upload-icon-wrap { width:64px; height:64px; background:var(--green-dim); border:1px solid var(--green-glow); border-radius:16px; margin:0 auto 1.2rem; display:flex; align-items:center; justify-content:center; font-size:1.8rem; }
+  .upload-zone h3 { font-size:1.05rem; font-weight:600; margin-bottom:.4rem; }
+  .upload-zone p { font-size:.82rem; color:var(--text-dim); line-height:1.6; }
+  .demo-btn { margin-top:1.2rem; font-family:var(--mono); font-size:.72rem; color:var(--text-mid); background:var(--surface2); border:1px solid var(--border); padding:8px 18px; border-radius:100px; cursor:pointer; transition:all .2s; letter-spacing:.04em; position:relative; z-index:2; }
+  .demo-btn:hover { color:var(--green); border-color:var(--green-glow); background:var(--green-dim); }
+
+  .dataset-info-bar { display:flex; align-items:center; gap:1rem; background:var(--surface2); border:1px solid var(--border); border-radius:var(--radius-sm); padding:.7rem 1rem; margin-bottom:1.2rem; font-family:var(--mono); font-size:.72rem; color:var(--text-mid); flex-wrap:wrap; }
+  .dataset-info-bar strong { color:var(--green); }
+  .sec-label { font-family:var(--mono); font-size:.65rem; color:var(--text-dim); letter-spacing:.1em; text-transform:uppercase; margin-bottom:.6rem; }
+
+  .col-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:.5rem; margin-bottom:1.2rem; }
+  .col-card { background:var(--surface2); border:1px solid var(--border); border-radius:var(--radius-sm); padding:.6rem .8rem; cursor:pointer; transition:all .2s; position:relative; }
+  .col-card:hover { border-color:var(--border-strong); }
+  .col-card.sel-target { border-color:var(--blue); background:var(--blue-dim); }
+  .col-card.sel-sensitive { border-color:var(--purple); background:rgba(157,111,255,0.1); }
+  .col-card.sel-target .col-name,.col-card.sel-target .col-type { color:var(--blue); }
+  .col-card.sel-sensitive .col-name,.col-card.sel-sensitive .col-type { color:var(--purple); }
+  .col-name { font-family:var(--mono); font-size:.72rem; font-weight:600; margin-bottom:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .col-type { font-size:.62rem; color:var(--text-dim); }
+  .col-badge { position:absolute; top:4px; right:4px; font-size:.55rem; font-family:var(--mono); padding:2px 5px; border-radius:4px; letter-spacing:.05em; }
+  .cb-target { background:var(--blue-dim); color:var(--blue); border:1px solid rgba(79,138,255,.3); }
+  .cb-sensitive { background:rgba(157,111,255,.12); color:var(--purple); border:1px solid rgba(157,111,255,.3); }
+
+  .config-row { display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-bottom:1.2rem; }
+  .config-field label { display:block; font-family:var(--mono); font-size:.65rem; color:var(--text-dim); margin-bottom:.4rem; letter-spacing:.08em; }
+  .config-field select { width:100%; background:var(--surface2); border:1px solid var(--border); border-radius:var(--radius-sm); padding:.6rem .8rem; color:var(--text); font-family:var(--mono); font-size:.8rem; outline:none; transition:border-color .2s; appearance:none; }
+  .config-field select:focus { border-color:var(--green-glow); }
+
+  .preview-wrap { overflow-x:auto; border:1px solid var(--border); border-radius:var(--radius-sm); margin-bottom:1rem; }
+  .preview-table { width:100%; border-collapse:collapse; font-family:var(--mono); font-size:.7rem; }
+  .preview-table th { background:var(--surface3); color:var(--text-mid); padding:.5rem .8rem; text-align:left; border-bottom:1px solid var(--border); white-space:nowrap; }
+  .preview-table td { padding:.4rem .8rem; border-bottom:1px solid rgba(255,255,255,.03); color:var(--text-mid); white-space:nowrap; max-width:120px; overflow:hidden; text-overflow:ellipsis; }
+  .preview-table tr:last-child td { border-bottom:none; }
+
+  .btn { display:inline-flex; align-items:center; gap:.5rem; padding:.65rem 1.4rem; border-radius:var(--radius-sm); font-family:var(--mono); font-size:.78rem; font-weight:600; cursor:pointer; transition:all .2s; border:none; letter-spacing:.02em; }
+  .btn-primary { background:var(--green); color:var(--bg); }
+  .btn-primary:hover:not(:disabled) { background:var(--green-bright); box-shadow:0 0 20px var(--green-glow); }
+  .btn-danger { background:var(--red); color:white; }
+  .btn-danger:hover:not(:disabled) { background:#ff6688; box-shadow:0 0 20px rgba(255,51,102,.3); }
+  .btn-outline { background:transparent; color:var(--text-mid); border:1px solid var(--border); }
+  .btn-outline:hover { color:var(--text); border-color:var(--border-strong); }
+  .btn:disabled { opacity:.45; cursor:not-allowed; }
+  .btn-row { display:flex; gap:.75rem; flex-wrap:wrap; align-items:center; margin-top:1.2rem; }
+
+  .severity-banner { border-radius:var(--radius); padding:1.5rem; margin-bottom:1.5rem; display:grid; grid-template-columns:auto 1fr auto; gap:1.5rem; align-items:center; border:1px solid; }
+  .severity-banner.SEVERE { border-color:rgba(255,51,102,.4); background:linear-gradient(135deg,rgba(255,51,102,.12),rgba(255,51,102,.04)); }
+  .severity-banner.MODERATE { border-color:rgba(255,204,2,.4); background:linear-gradient(135deg,rgba(255,204,2,.1),rgba(255,204,2,.04)); }
+  .severity-banner.MILD { border-color:rgba(255,107,53,.4); background:linear-gradient(135deg,rgba(255,107,53,.1),rgba(255,107,53,.04)); }
+  .severity-banner.FAIR { border-color:rgba(0,230,118,.4); background:linear-gradient(135deg,rgba(0,230,118,.1),rgba(0,230,118,.04)); }
+  .sev-label { font-family:var(--mono); font-size:.6rem; color:var(--text-dim); letter-spacing:.1em; margin-bottom:4px; }
+  .sev-status { font-family:var(--mono); font-size:1.8rem; font-weight:700; line-height:1; }
+  .SEVERE .sev-status,.SEVERE .sev-score { color:var(--red); }
+  .MODERATE .sev-status,.MODERATE .sev-score { color:var(--yellow); }
+  .MILD .sev-status,.MILD .sev-score { color:var(--orange); }
+  .FAIR .sev-status,.FAIR .sev-score { color:var(--green); }
+  .sev-impact { font-size:.88rem; color:var(--text-mid); line-height:1.6; font-weight:300; }
+  .sev-score { font-family:var(--mono); font-size:2.5rem; font-weight:700; line-height:1; }
+  .sev-score-label { font-family:var(--mono); font-size:.6rem; color:var(--text-dim); letter-spacing:.08em; margin-top:3px; }
+
+  .gauge-wrap { display:flex; align-items:center; gap:1.5rem; background:var(--surface2); border:1px solid var(--border); border-radius:var(--radius); padding:1.2rem 1.5rem; margin-bottom:1.5rem; }
+  .gauge-track { flex:1; height:10px; background:var(--surface3); border-radius:100px; overflow:visible; position:relative; }
+  .gauge-fill { height:100%; border-radius:100px; transition:width 1.2s cubic-bezier(.4,0,.2,1); }
+  .gauge-fill.low { background:var(--green); }
+  .gauge-fill.mid { background:var(--yellow); }
+  .gauge-fill.high { background:var(--orange); }
+  .gauge-fill.critical { background:var(--red); }
+  .gauge-threshold { position:absolute; top:-5px; bottom:-5px; width:2px; background:rgba(255,255,255,.35); left:80%; }
+  .gauge-threshold::after { content:'80%'; position:absolute; top:-18px; left:4px; font-family:var(--mono); font-size:.55rem; color:rgba(255,255,255,.4); white-space:nowrap; }
+  .gauge-label { font-family:var(--mono); font-size:.65rem; color:var(--text-dim); white-space:nowrap; }
+  .gauge-di { font-family:var(--mono); font-size:1.1rem; font-weight:700; white-space:nowrap; }
+
+  .metrics-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:.75rem; margin-bottom:1.5rem; }
+  .metric-card { background:var(--surface2); border:1px solid var(--border); border-radius:var(--radius); padding:1rem 1.2rem; animation:fadeUp .4s ease both; }
+  .metric-label { font-family:var(--mono); font-size:.62rem; color:var(--text-dim); letter-spacing:.08em; margin-bottom:.5rem; text-transform:uppercase; }
+  .metric-val { font-family:var(--mono); font-size:1.7rem; font-weight:700; line-height:1; margin-bottom:.4rem; }
+  .metric-val.pass { color:var(--green); }
+  .metric-val.warn { color:var(--yellow); }
+  .metric-val.fail { color:var(--red); }
+  .metric-sub { font-size:.72rem; color:var(--text-dim); }
+
+  .ai-box { background:var(--surface2); border:1px solid var(--border); border-left:3px solid var(--green); border-radius:var(--radius); padding:1rem 1.2rem; margin-bottom:1.5rem; position:relative; }
+  .ai-box::before { content:'AI INSIGHT'; position:absolute; top:.7rem; right:.8rem; font-family:var(--mono); font-size:.55rem; color:var(--green); letter-spacing:.1em; background:var(--green-dim); padding:2px 7px; border-radius:4px; }
+  .ai-box p { font-size:.88rem; line-height:1.7; color:var(--text-mid); font-weight:300; padding-right:5rem; }
+
+  .chart-box { background:var(--surface2); border:1px solid var(--border); border-radius:var(--radius); padding:1.2rem; margin-bottom:1.5rem; }
+  .chart-title { font-family:var(--mono); font-size:.7rem; color:var(--text-dim); letter-spacing:.08em; text-transform:uppercase; margin-bottom:1rem; }
+
+  .risk-table { width:100%; border-collapse:collapse; }
+  .risk-table th { font-family:var(--mono); font-size:.62rem; color:var(--text-dim); letter-spacing:.08em; text-align:left; padding:.6rem .8rem; border-bottom:1px solid var(--border); background:var(--surface3); text-transform:uppercase; }
+  .risk-table td { font-size:.8rem; padding:.55rem .8rem; border-bottom:1px solid rgba(255,255,255,.03); }
+  .risk-table tr:last-child td { border-bottom:none; }
+  .risk-badge { font-family:var(--mono); font-size:.62rem; font-weight:700; padding:3px 8px; border-radius:4px; letter-spacing:.06em; }
+  .risk-HIGH { background:var(--red-dim); color:var(--red); border:1px solid rgba(255,51,102,.3); }
+  .risk-MEDIUM { background:var(--yellow-dim); color:var(--yellow); border:1px solid rgba(255,204,2,.3); }
+  .risk-LOW { background:var(--green-dim); color:var(--green); border:1px solid var(--green-glow); }
+
+  .compliance-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:.75rem; margin-bottom:1.5rem; }
+  .compliance-item { background:var(--surface2); border:1px solid var(--border); border-radius:var(--radius-sm); padding:.8rem 1rem; display:flex; align-items:center; gap:1rem; }
+  .compliance-text { flex:1; }
+  .compliance-name { font-size:.78rem; font-weight:600; margin-bottom:2px; }
+  .compliance-desc { font-size:.68rem; color:var(--text-dim); }
+  .eeoc-badge { display:inline-flex; align-items:center; gap:.4rem; font-family:var(--mono); font-size:.65rem; padding:4px 10px; border-radius:4px; font-weight:700; letter-spacing:.05em; }
+  .eeoc-pass { background:var(--green-dim); color:var(--green); border:1px solid var(--green-glow); }
+  .eeoc-fail { background:var(--red-dim); color:var(--red); border:1px solid rgba(255,51,102,.3); }
+
+  .before-after { display:grid; grid-template-columns:1fr auto 1fr; gap:1rem; align-items:start; margin-bottom:1.5rem; }
+  .ba-label { font-family:var(--mono); font-size:.62rem; letter-spacing:.1em; margin-bottom:.8rem; text-align:center; }
+  .before-col .ba-label { color:var(--red); }
+  .after-col .ba-label { color:var(--green); }
+  .ba-arrow { display:flex; align-items:center; justify-content:center; font-size:1.5rem; color:var(--text-dim); padding-top:2rem; }
+  .improvement-pill { display:inline-flex; align-items:center; gap:.4rem; font-family:var(--mono); font-size:.72rem; padding:5px 14px; border-radius:100px; font-weight:700; }
+  .improvement-pill.eeoc { background:var(--green-dim); color:var(--green); border:1px solid var(--green-glow); }
+  .improvement-pill.warning { background:var(--yellow-dim); color:var(--yellow); border:1px solid rgba(255,204,2,.3); }
+  .big-reduction { text-align:center; padding:1.5rem; border-bottom:1px solid var(--border); margin-bottom:1.5rem; }
+  .big-pct { font-family:var(--mono); font-size:3.5rem; font-weight:700; color:var(--green); line-height:1; margin-bottom:.3rem; text-shadow:0 0 40px var(--green-glow); }
+  .big-pct-label { font-size:.8rem; color:var(--text-dim); }
+  .pill-row { display:flex; justify-content:center; gap:.5rem; flex-wrap:wrap; margin-top:.8rem; }
+
+  .report-field { display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-bottom:1.2rem; }
+  .report-field label { display:block; font-family:var(--mono); font-size:.65rem; color:var(--text-dim); letter-spacing:.08em; margin-bottom:.4rem; }
+  .report-field input { width:100%; background:var(--surface2); border:1px solid var(--border); border-radius:var(--radius-sm); padding:.6rem .8rem; color:var(--text); font-family:var(--mono); font-size:.8rem; outline:none; transition:border-color .2s; }
+  .report-field input:focus { border-color:var(--green-glow); }
+
+  .loading-inline { display:flex; align-items:center; gap:.8rem; padding:1rem; color:var(--text-dim); font-family:var(--mono); font-size:.78rem; }
+  .loading-inline.hidden { display:none; }
+  .spinner { width:18px; height:18px; border:2px solid var(--border); border-top-color:var(--green); border-radius:50%; animation:spin .7s linear infinite; flex-shrink:0; }
+  @keyframes spin { to{transform:rotate(360deg)} }
+
+  #toast { position:fixed; bottom:1.5rem; left:50%; transform:translateX(-50%) translateY(80px); background:var(--surface2); border:1px solid var(--border-strong); border-radius:100px; padding:.65rem 1.5rem; font-family:var(--mono); font-size:.78rem; opacity:0; transition:all .35s cubic-bezier(.34,1.56,.64,1); pointer-events:none; z-index:200; white-space:nowrap; }
+  #toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+  #toast.success { color:var(--green); border-color:var(--green-glow); background:var(--green-dim); }
+  #toast.error { color:var(--red); border-color:rgba(255,51,102,.4); background:var(--red-dim); }
+  #toast.info { color:var(--blue); border-color:rgba(79,138,255,.3); background:var(--blue-dim); }
+
+  .small-warn { background:var(--yellow-dim); border:1px solid rgba(255,204,2,.25); border-radius:var(--radius-sm); padding:.6rem .8rem; font-size:.78rem; color:var(--yellow); margin-bottom:1rem; }
+  .divider { height:1px; background:var(--border); margin:1.2rem 0; }
+
+  .features-row { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:.75rem; margin:2rem 0 3rem; animation:fadeUp .7s ease both .35s; }
+  .feature-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:1.2rem; transition:border-color .2s; }
+  .feature-card:hover { border-color:var(--border-strong); }
+  .feature-icon { font-size:1.4rem; margin-bottom:.7rem; display:block; }
+  .feature-title { font-weight:600; font-size:.88rem; margin-bottom:.3rem; }
+  .feature-desc { font-size:.75rem; color:var(--text-dim); line-height:1.55; }
+
+  details > summary { cursor:pointer; font-family:var(--mono); font-size:.72rem; color:var(--text-dim); letter-spacing:.05em; margin-bottom:.5rem; }
+
+  @media (max-width:640px) {
+    .severity-banner { grid-template-columns:1fr; text-align:center; }
+    .before-after { grid-template-columns:1fr; }
+    .ba-arrow { display:none; }
+    .config-row,.report-field { grid-template-columns:1fr; }
+    .step-bar { overflow-x:auto; justify-content:flex-start; }
+    .hero h1 { font-size:2.4rem; }
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="logo">
+    <div class="logo-icon">⚖️</div>
+    FairLens AI
+  </div>
+  <div class="nav-pills">
+    <span class="nav-pill live">v2.0</span>
+    <span class="nav-pill">EEOC · EU AI Act · NYC LL144</span>
+  </div>
+</nav>
+
+<div class="step-bar">
+  <div class="step-item active" id="step1"><div class="step-num">1</div> UPLOAD</div>
+  <div class="step-divider"></div>
+  <div class="step-item" id="step2"><div class="step-num">2</div> CONFIGURE</div>
+  <div class="step-divider"></div>
+  <div class="step-item" id="step3"><div class="step-num">3</div> ANALYZE</div>
+  <div class="step-divider"></div>
+  <div class="step-item" id="step4"><div class="step-num">4</div> REMEDIATE</div>
+</div>
+
+<main>
+  <div class="hero">
+    <div class="hero-badge">⚡ AI Bias Detection &amp; Remediation Platform</div>
+    <h1>Know Before You <em>Deploy</em></h1>
+    <p>Detect, quantify, and fix discriminatory bias in your AI systems before they impact real people. EEOC-compliant audit reports in minutes.</p>
+    <div class="stat-row">
+      <div><div class="stat-num">5</div><div class="stat-label">Fairness Metrics</div></div>
+      <div><div class="stat-num">2</div><div class="stat-label">Debias Algorithms</div></div>
+      <div><div class="stat-num">3</div><div class="stat-label">Compliance Standards</div></div>
+      <div><div class="stat-num">PDF</div><div class="stat-label">Audit Report</div></div>
+    </div>
+  </div>
+
+  <div class="container">
+
+    <!-- UPLOAD PANEL -->
+    <div class="panel" id="uploadPanel">
+      <div class="panel-header">
+        <div class="panel-num">1</div>
+        <div class="panel-title">Upload Dataset</div>
+        <div class="panel-meta">CSV · Up to 10MB · 500k rows</div>
+      </div>
+      <div class="panel-body">
+        <div class="upload-zone" id="uploadZone">
+          <input type="file" id="fileInput" accept=".csv">
+          <div class="upload-icon-wrap">📊</div>
+          <h3>Drop your CSV dataset here</h3>
+          <p>Drag &amp; drop or click to browse<br>Hiring, lending, healthcare, education — any domain</p>
+          <button class="demo-btn" id="demoBtn">▶ Load Demo Dataset (Hiring Bias)</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- CONFIG PANEL -->
+    <div class="panel hidden" id="configPanel">
+      <div class="panel-header">
+        <div class="panel-num">2</div>
+        <div class="panel-title">Configure Analysis</div>
+        <div class="panel-meta" id="datasetMeta">—</div>
+      </div>
+      <div class="panel-body">
+        <div class="dataset-info-bar">
+          <span>📁 <strong id="fileName">—</strong></span>
+          <span>Rows: <strong id="rowCount">—</strong></span>
+          <span>Columns: <strong id="colCount">—</strong></span>
+        </div>
+
+        <details style="margin-bottom:1.2rem">
+          <summary>▶ PREVIEW DATA (first 5 rows)</summary>
+          <div class="preview-wrap" id="previewWrap"></div>
+        </details>
+
+        <div class="divider"></div>
+
+        <p class="sec-label" style="margin-top:.8rem">STEP 1 — Select Target Column (what you're predicting)</p>
+        <div class="col-grid" id="targetGrid"></div>
+
+        <p class="sec-label">STEP 2 — Select Sensitive Attribute (protected characteristic)</p>
+        <div class="col-grid" id="sensitiveGrid"></div>
+
+        <div class="config-row" id="outcomeRow" style="display:none">
+          <div class="config-field">
+            <label>POSITIVE OUTCOME VALUE</label>
+            <select id="positiveOutcomeSelect">
+              <option value="">— select value —</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="loading-inline hidden" id="analyzeLoading">
+          <div class="spinner"></div>
+          <span id="loadingText">Running bias analysis...</span>
+        </div>
+
+        <div class="btn-row">
+          <button class="btn btn-primary" id="analyzeBtn" onclick="runAnalysis()" disabled>🔍 Run Bias Analysis</button>
+          <button class="btn btn-outline" onclick="resetAll()">↩ Start Over</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- RESULTS PANEL -->
+    <div class="panel hidden" id="resultsPanel">
+      <div class="panel-header">
+        <div class="panel-num">3</div>
+        <div class="panel-title">Bias Analysis Results</div>
+        <div class="panel-meta" id="resultsMeta">—</div>
+      </div>
+      <div class="panel-body" id="resultsBody"></div>
+    </div>
+
+    <!-- FIX PANEL -->
+    <div class="panel hidden" id="fixPanel">
+      <div class="panel-header">
+        <div class="panel-num">4</div>
+        <div class="panel-title">Debias &amp; Remediate</div>
+        <div class="panel-meta">Reweighing + Threshold Optimisation</div>
+      </div>
+      <div class="panel-body">
+        <p style="font-size:.88rem;color:var(--text-mid);line-height:1.7;margin-bottom:1.2rem;font-weight:300">
+          FairLens applies a chain of debiasing strategies — <strong>Reweighing</strong> (preprocessing) then <strong>Threshold Optimisation</strong> (post-processing) — selecting whichever achieves EEOC compliance. Accuracy impact is measured via real cross-validation.
+        </p>
+        <div class="loading-inline hidden" id="fixLoading">
+          <div class="spinner"></div>
+          <span>Applying debiasing strategy chain...</span>
+        </div>
+        <div id="fixResults" class="hidden"></div>
+        <div class="btn-row">
+          <button class="btn btn-danger" id="fixBtn" onclick="applyFix()">⚡ Apply Auto-Debias</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- REPORT PANEL -->
+    <div class="panel hidden" id="reportPanel">
+      <div class="panel-header">
+        <div class="panel-num">5</div>
+        <div class="panel-title">Compliance Audit Report</div>
+        <div class="panel-meta">PDF · Proxy Features · EEOC</div>
+      </div>
+      <div class="panel-body">
+        <p style="font-size:.88rem;color:var(--text-mid);line-height:1.7;margin-bottom:1.2rem;font-weight:300">
+          Generate a professional PDF compliance report documenting all fairness metrics, proxy feature risks, AI explanation, and remediation results. Suitable for legal, HR, and regulatory review.
+        </p>
+        <div class="report-field">
+          <div><label>ORGANIZATION NAME</label><input type="text" id="orgName" placeholder="Your Organization"></div>
+          <div><label>AUDITOR NAME</label><input type="text" id="auditorName" placeholder="FairLens AI System"></div>
+        </div>
+        <div class="loading-inline hidden" id="reportLoading">
+          <div class="spinner"></div><span>Generating compliance report...</span>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-primary" onclick="generateReport()">📄 Download PDF Report</button>
+          <button class="btn btn-outline" onclick="resetAll()">🔄 New Analysis</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- FEATURES SECTION -->
+    <div id="featuresSection">
+      <p class="sec-label" style="text-align:center;margin-bottom:1rem">What FairLens Detects</p>
+      <div class="features-row">
+        <div class="feature-card"><span class="feature-icon">📐</span><div class="feature-title">Disparate Impact</div><div class="feature-desc">EEOC 80% rule. Detects when selection rates differ significantly across protected groups.</div></div>
+        <div class="feature-card"><span class="feature-icon">⚖️</span><div class="feature-title">Demographic Parity</div><div class="feature-desc">Measures selection rate gap between privileged and unprivileged groups in absolute terms.</div></div>
+        <div class="feature-card"><span class="feature-icon">🎯</span><div class="feature-title">Equal Opportunity</div><div class="feature-desc">True positive rate gap across groups. Are qualified candidates equally likely to be selected?</div></div>
+        <div class="feature-card"><span class="feature-icon">🔍</span><div class="feature-title">Proxy Features</div><div class="feature-desc">Detects features correlated with sensitive attributes that can re-introduce bias indirectly.</div></div>
+      </div>
+    </div>
+
+  </div>
+</main>
+
+<div id="toast"></div>
+
+<script>
+const state = { sessionId:null, columns:[], targetCol:null, sensitiveCol:null, positiveOutcome:null, analysis:null, fixed:null };
+const API = window.location.origin;
+
+function toast(msg, type='info') {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.className = `show ${type}`;
+  clearTimeout(window._tt);
+  window._tt = setTimeout(() => el.className = '', 3200);
+}
+
+function setStep(n) {
+  for (let i=1; i<=4; i++) {
+    const el = document.getElementById(`step${i}`);
+    el.className = 'step-item' + (i===n?' active':i<n?' done':'');
+  }
+}
+
+// ── Upload setup ──
+const uploadZone = document.getElementById('uploadZone');
+const fileInput = document.getElementById('fileInput');
+
+uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('dragover'); });
+uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('dragover'));
+uploadZone.addEventListener('drop', e => {
+  e.preventDefault(); uploadZone.classList.remove('dragover');
+  const f = e.dataTransfer.files[0]; if (f) handleFile(f);
+});
+fileInput.addEventListener('change', e => { if (e.target.files[0]) handleFile(e.target.files[0]); });
+document.getElementById('demoBtn').addEventListener('click', e => { e.stopPropagation(); loadDemo(); });
+
+async function handleFile(file) {
+  if (!file.name.toLowerCase().endsWith('.csv')) { toast('Only CSV files supported', 'error'); return; }
+  setUploadLoading('Uploading ' + file.name + '...');
+  const fd = new FormData(); fd.append('file', file);
+  try {
+    const res = await fetch(`${API}/api/upload`, { method:'POST', body:fd });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || data.detail || JSON.stringify(data));
+    handleUploadSuccess(data); toast('Dataset loaded ✓', 'success');
+  } catch(e) { toast(`Upload failed: ${e.message}`, 'error'); resetUploadZone(); }
+}
+
+async function loadDemo() {
+  setUploadLoading('Loading hiring bias demo...');
+  try {
+    const res = await fetch(`${API}/api/demo`);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || data.detail || JSON.stringify(data));
+    handleUploadSuccess(data, data.suggested); toast('Demo dataset loaded ✓', 'success');
+  } catch(e) { toast(`Demo load failed: ${e.message}`, 'error'); resetUploadZone(); }
+}
+
+function setUploadLoading(msg) {
+  uploadZone.innerHTML = `
+    <div class="upload-icon-wrap"><div class="spinner" style="width:28px;height:28px;margin:auto"></div></div>
+    <p style="color:var(--text-mid);margin-top:.5rem">${msg}</p>`;
+}
+
+function handleUploadSuccess(data, suggested=null) {
+  state.sessionId = data.session_id; state.columns = data.columns;
+  document.getElementById('fileName').textContent = data.filename;
+  document.getElementById('rowCount').textContent = data.rows.toLocaleString();
+  document.getElementById('colCount').textContent = data.columns.length;
+  document.getElementById('datasetMeta').textContent = `${data.filename} · ${data.rows.toLocaleString()} rows`;
+
+  if (data.preview && data.preview.length) {
+    const cols = Object.keys(data.preview[0]);
+    document.getElementById('previewWrap').innerHTML = `
+      <table class="preview-table">
+        <thead><tr>${cols.map(c=>`<th>${c}</th>`).join('')}</tr></thead>
+        <tbody>${data.preview.map(row=>`<tr>${cols.map(c=>`<td title="${row[c]??''}">${row[c]??''}</td>`).join('')}</tr>`).join('')}</tbody>
+      </table>`;
+  }
+
+  buildColumnGrids(data.columns, suggested);
+  document.getElementById('uploadPanel').classList.add('hidden');
+  document.getElementById('configPanel').classList.remove('hidden');
+  document.getElementById('featuresSection').style.display = 'none';
+  setStep(2);
+}
+
+function buildColumnGrids(cols, suggested=null) {
+  ['targetGrid','sensitiveGrid'].forEach(id => document.getElementById(id).innerHTML = '');
+  cols.forEach(col => {
+    ['target','sensitive'].forEach(type => {
+      const card = document.createElement('div');
+      card.className = 'col-card'; card.dataset.col = col.name;
+      card.innerHTML = `<div class="col-name" title="${col.name}">${col.name}</div><div class="col-type">${col.dtype} · ${col.unique_count} unique</div>`;
+      card.addEventListener('click', () => selectColumn(col, type, card));
+      document.getElementById(type+'Grid').appendChild(card);
+    });
+  });
+
+  if (suggested) {
+    if (suggested.target) {
+      const col = cols.find(c => c.name === suggested.target);
+      const card = document.querySelector(`#targetGrid [data-col="${suggested.target}"]`);
+      if (col && card) selectColumn(col, 'target', card);
+    }
+    if (suggested.sensitive) {
+      const col = cols.find(c => c.name === suggested.sensitive);
+      const card = document.querySelector(`#sensitiveGrid [data-col="${suggested.sensitive}"]`);
+      if (col && card) selectColumn(col, 'sensitive', card);
+    }
+    if (suggested.positive_outcome) {
+      setTimeout(() => {
+        const sel = document.getElementById('positiveOutcomeSelect');
+        const opt = Array.from(sel.options).find(o => o.value === String(suggested.positive_outcome));
+        if (opt) { sel.value = opt.value; state.positiveOutcome = opt.value; checkReady(); }
+      }, 80);
+    }
+  }
+}
+
+function selectColumn(col, type, card) {
+  document.querySelectorAll(`#${type}Grid .col-card`).forEach(c => {
+    c.classList.remove(`sel-${type}`);
+    const b = c.querySelector('.col-badge'); if (b) b.remove();
+  });
+  card.classList.add(`sel-${type}`);
+  const badge = document.createElement('span');
+  badge.className = `col-badge cb-${type}`;
+  badge.textContent = type === 'target' ? 'TARGET' : 'SENSITIVE';
+  card.appendChild(badge);
+
+  if (type === 'target') {
+    state.targetCol = col.name; state.positiveOutcome = null;
+    const sel = document.getElementById('positiveOutcomeSelect');
+    sel.innerHTML = '<option value="">— select value —</option>';
+    col.sample_values.forEach(v => { const o = document.createElement('option'); o.value=v; o.textContent=v; sel.appendChild(o); });
+    sel.onchange = () => { state.positiveOutcome = sel.value; checkReady(); };
+    document.getElementById('outcomeRow').style.display = '';
+  } else {
+    state.sensitiveCol = col.name;
+  }
+  checkReady();
+}
+
+function checkReady() {
+  document.getElementById('analyzeBtn').disabled = !(state.targetCol && state.sensitiveCol && state.positiveOutcome);
+}
+
+// ── ANALYZE ──
+async function runAnalysis() {
+  const loadEl = document.getElementById('analyzeLoading');
+  const btn = document.getElementById('analyzeBtn');
+  loadEl.classList.remove('hidden'); btn.disabled = true;
+  const msgs = ['Computing disparate impact ratios...','Measuring demographic parity gaps...','Detecting proxy features...','Estimating real-world impact...','Getting AI explanation...'];
+  let mi = 0;
+  const iv = setInterval(() => { document.getElementById('loadingText').textContent = msgs[mi++%msgs.length]; }, 1100);
+  try {
+    const res = await fetch(`${API}/api/analyze`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ session_id:state.sessionId, target_column:state.targetCol, sensitive_column:state.sensitiveCol, positive_outcome:state.positiveOutcome })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || data.detail || JSON.stringify(data));
+    state.analysis = data;
+    renderResults(data); setStep(3); toast('Analysis complete ✓', 'success');
+  } catch(e) { toast(`Analysis failed: ${e.message}`, 'error'); }
+  finally { clearInterval(iv); loadEl.classList.add('hidden'); btn.disabled = false; }
+}
+
+// ── RENDER RESULTS ──
+function renderResults(data) {
+  const { severity, metrics: m, affected_estimate: aff, group_stats: gs,
+          feature_importance: feats=[], dataset_info: info, severity_score: score, ai_explanation: aiExp } = data;
+  document.getElementById('resultsMeta').textContent = `${info.sensitive_attribute} → ${info.target_attribute}`;
+  const sevColor = {SEVERE:'var(--red)',MODERATE:'var(--yellow)',MILD:'var(--orange)',FAIR:'var(--green)'}[severity]||'var(--text-dim)';
+  const diPct = (m.disparate_impact * 100).toFixed(1);
+  const diClass = m.disparate_impact<0.6?'critical':m.disparate_impact<0.8?'high':m.disparate_impact<0.9?'mid':'low';
+
+  document.getElementById('resultsBody').innerHTML = `
+    <div class="severity-banner ${severity}">
+      <div>
+        <div class="sev-label">BIAS STATUS</div>
+        <div class="sev-status">${severity}</div>
+        <div style="margin-top:.5rem"><span class="eeoc-badge ${m.passes_80_rule?'eeoc-pass':'eeoc-fail'}">${m.passes_80_rule?'✓ EEOC PASS':'✗ EEOC FAIL'}</span></div>
+      </div>
+      <div class="sev-impact">${aff?.narrative||'Analysis complete.'}</div>
+      <div style="text-align:center"><div class="sev-score">${score}</div><div class="sev-score-label">BIAS SCORE / 100</div></div>
+    </div>
+
+    <div class="gauge-wrap">
+      <div class="gauge-label">Disparate Impact</div>
+      <div class="gauge-track">
+        <div class="gauge-fill ${diClass}" id="gaugeFill" style="width:0%"></div>
+        <div class="gauge-threshold"></div>
+      </div>
+      <div class="gauge-di" style="color:${sevColor}">${m.disparate_impact.toFixed(3)}</div>
+    </div>
+
+    <div class="metrics-grid">
+      <div class="metric-card" style="animation-delay:.05s">
+        <div class="metric-label">Disparate Impact Ratio</div>
+        <div class="metric-val ${m.disparate_impact>=.8?'pass':m.disparate_impact>=.6?'warn':'fail'}">${m.disparate_impact.toFixed(3)}</div>
+        <div class="metric-sub">${m.passes_80_rule?'✅ Passes EEOC 80% Rule':'❌ EEOC Violation'}</div>
+      </div>
+      <div class="metric-card" style="animation-delay:.1s">
+        <div class="metric-label">Demographic Parity Gap</div>
+        <div class="metric-val ${m.demographic_parity_diff<.1?'pass':m.demographic_parity_diff<.2?'warn':'fail'}">${(m.demographic_parity_diff*100).toFixed(1)}%</div>
+        <div class="metric-sub">${m.demographic_parity_diff<.1?'✅ Within threshold':'❌ Gap > 10%'}</div>
+      </div>
+      <div class="metric-card" style="animation-delay:.15s">
+        <div class="metric-label">Privileged Group</div>
+        <div class="metric-val" style="color:var(--green);font-size:1.3rem">${m.privileged_group}</div>
+        <div class="metric-sub">Selected at ${(m.max_selection_rate*100).toFixed(1)}%</div>
+      </div>
+      <div class="metric-card" style="animation-delay:.2s">
+        <div class="metric-label">Unprivileged Group</div>
+        <div class="metric-val" style="color:var(--red);font-size:1.3rem">${m.unprivileged_group}</div>
+        <div class="metric-sub">Selected at only ${(m.min_selection_rate*100).toFixed(1)}%</div>
+      </div>
+    </div>
+
+    ${aiExp?`<div class="ai-box"><p>${aiExp}</p></div>`:''}
+
+    <div class="chart-box">
+      <div class="chart-title">Selection Rate by Group — ${info.sensitive_attribute}</div>
+      <canvas id="groupChart" height="110"></canvas>
+    </div>
+
+    <p class="sec-label">Regulatory Compliance</p>
+    <div class="compliance-grid">
+      <div class="compliance-item">
+        <div>${m.passes_80_rule?'✅':'❌'}</div>
+        <div class="compliance-text"><div class="compliance-name">EEOC 80% Rule (US)</div><div class="compliance-desc">Employment discrimination standard</div></div>
+        <span class="eeoc-badge ${m.passes_80_rule?'eeoc-pass':'eeoc-fail'}">${m.passes_80_rule?'PASS':'FAIL'}</span>
+      </div>
+      <div class="compliance-item">
+        <div>${m.demographic_parity_diff<.1?'✅':'⚠️'}</div>
+        <div class="compliance-text"><div class="compliance-name">EU AI Act (High Risk)</div><div class="compliance-desc">Demographic parity threshold</div></div>
+        <span class="eeoc-badge ${m.demographic_parity_diff<.1?'eeoc-pass':'eeoc-fail'}">${m.demographic_parity_diff<.1?'PASS':'REVIEW'}</span>
+      </div>
+      <div class="compliance-item">
+        <div>${severity!=='SEVERE'?'✅':'❌'}</div>
+        <div class="compliance-text"><div class="compliance-name">NYC Local Law 144</div><div class="compliance-desc">Automated employment decision audit</div></div>
+        <span class="eeoc-badge ${severity!=='SEVERE'?'eeoc-pass':'eeoc-fail'}">${severity!=='SEVERE'?'PASS':'FAIL'}</span>
+      </div>
+    </div>
+
+    ${feats.length?`
+    <p class="sec-label" style="margin-top:.5rem">Proxy Feature Risk (Correlation with ${info.sensitive_attribute})</p>
+    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:1.5rem">
+      <table class="risk-table">
+        <thead><tr><th>Feature</th><th>Correlation</th><th>Method</th><th>Risk</th></tr></thead>
+        <tbody>${feats.map(f=>`
+          <tr>
+            <td style="font-family:var(--mono)">${f.feature}</td>
+            <td style="font-family:var(--mono)">${f.correlation_with_sensitive.toFixed(3)}</td>
+            <td style="font-size:.72rem;color:var(--text-dim)">${f.method==='cramers_v'?"Cramér's V":'Pearson |r|'}</td>
+            <td><span class="risk-badge risk-${f.risk_level}">${f.risk_level}</span></td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`:''}
+
+    ${Object.entries(gs).some(([,s])=>s.small_sample_warning)?`
+    <div class="small-warn">⚠️ <strong>Small sample warning:</strong> Groups with < 30 samples — ${Object.entries(gs).filter(([,s])=>s.small_sample_warning).map(([g])=>g).join(', ')} — statistics may be unreliable.</div>`:''}
+  `;
+
+  setTimeout(() => { const el = document.getElementById('gaugeFill'); if(el) el.style.width = diPct+'%'; }, 80);
+
+  const groups = Object.keys(gs);
+  const rates = groups.map(g => +(gs[g].selection_rate*100).toFixed(2));
+  const colors = groups.map(g => g===m.unprivileged_group?'rgba(255,51,102,0.8)':g===m.privileged_group?'rgba(0,230,118,0.8)':'rgba(79,138,255,0.7)');
+  new Chart(document.getElementById('groupChart').getContext('2d'), {
+    type:'bar',
+    data:{ labels:groups, datasets:[
+      { label:'Selection Rate (%)', data:rates, backgroundColor:colors, borderColor:colors.map(c=>c.replace('0.8','1').replace('0.7','1')), borderWidth:1, borderRadius:6 },
+      { label:`Mean (${(m.mean_selection_rate*100).toFixed(1)}%)`, data:groups.map(()=>+(m.mean_selection_rate*100).toFixed(2)), type:'line', borderColor:'rgba(255,204,2,0.7)', borderWidth:2, borderDash:[6,4], pointRadius:0, fill:false },
+      { label:'EEOC 80% Threshold', data:groups.map(()=>+(m.max_selection_rate*80).toFixed(2)), type:'line', borderColor:'rgba(255,51,102,0.4)', borderWidth:1, borderDash:[3,4], pointRadius:0, fill:false },
+    ]},
+    options:{ responsive:true, animation:{duration:900,easing:'easeOutQuart'},
+      plugins:{ legend:{labels:{color:'#5a6178',font:{family:'JetBrains Mono',size:10},boxWidth:14}}, tooltip:{backgroundColor:'#0c0f1a',borderColor:'rgba(255,255,255,0.1)',borderWidth:1,titleColor:'#e2e8f8',bodyColor:'#8892aa'} },
+      scales:{ x:{ticks:{color:'#5a6178',font:{family:'JetBrains Mono',size:10}},grid:{color:'rgba(255,255,255,0.03)'}}, y:{ticks:{color:'#5a6178',font:{family:'JetBrains Mono',size:10},callback:v=>v+'%'},grid:{color:'rgba(255,255,255,0.03)'}} }
+    }
+  });
+
+  document.getElementById('resultsPanel').classList.remove('hidden');
+  document.getElementById('fixPanel').classList.remove('hidden');
+  setTimeout(() => document.getElementById('resultsPanel').scrollIntoView({behavior:'smooth'}), 100);
+}
+
+// ── FIX ──
+async function applyFix() {
+  const loadEl = document.getElementById('fixLoading');
+  const btn = document.getElementById('fixBtn');
+  loadEl.classList.remove('hidden'); btn.disabled = true;
+  try {
+    const res = await fetch(`${API}/api/fix`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({session_id:state.sessionId}) });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || data.detail || JSON.stringify(data));
+    state.fixed = data;
+    renderFix(data);
+    document.getElementById('reportPanel').classList.remove('hidden');
+    setStep(4); toast('Bias reduced ✓', 'success');
+  } catch(e) { toast(`Fix failed: ${e.message}`, 'error'); btn.disabled = false; }
+  finally { loadEl.classList.add('hidden'); }
+}
+
+function renderFix(data) {
+  const { improvement, fixed_metrics:fixed, fixed_group_stats:fixedStats, ai_explanation:aiExp,
+          algorithm, accuracy_delta:accDelta, persistent_bias_warning:persistWarning } = data;
+  const orig = state.analysis.metrics;
+  const accStr = accDelta!=null ? `${accDelta>=0?'+':''}${(accDelta*100).toFixed(2)}%` : 'N/A (label-only)';
+  const accColor = accDelta==null?'var(--text-dim)':accDelta>=-0.02?'var(--green)':'var(--yellow)';
+
+  const container = document.getElementById('fixResults');
+  container.innerHTML = `
+    ${persistWarning?`<div class="small-warn" style="background:var(--red-dim);border-color:rgba(255,51,102,.3);color:var(--red)">⚠️ <strong>Persistent Bias:</strong> ${persistWarning}</div>`:''}
+    <div class="big-reduction">
+      <div style="font-family:var(--mono);font-size:.65rem;color:var(--text-dim);letter-spacing:.1em;margin-bottom:.5rem">ALGORITHM: ${algorithm||'Reweighing'}</div>
+      <div class="big-pct">↓ ${improvement.overall_bias_reduction_pct.toFixed(0)}%</div>
+      <div class="big-pct-label">Overall Bias Reduction</div>
+      <div class="pill-row">
+        <span class="improvement-pill ${improvement.eeoc_compliant?'eeoc':'warning'}">${improvement.eeoc_compliant?'✅ EEOC Compliant':'⚠️ Approaching Compliance'}</span>
+        <span class="improvement-pill eeoc">New Status: ${improvement.new_severity}</span>
+        <span class="improvement-pill" style="background:rgba(255,255,255,.05);color:${accColor};border:1px solid var(--border)">Accuracy Δ: ${accStr}</span>
+      </div>
+    </div>
+
+    <div class="before-after">
+      <div class="before-col">
+        <div class="ba-label">BEFORE</div>
+        <div class="metrics-grid" style="grid-template-columns:1fr">
+          <div class="metric-card"><div class="metric-label">Disparate Impact</div><div class="metric-val fail">${orig.disparate_impact.toFixed(3)}</div></div>
+          <div class="metric-card"><div class="metric-label">DP Gap</div><div class="metric-val fail">${(orig.demographic_parity_diff*100).toFixed(1)}%</div></div>
+          <div class="metric-card"><div class="metric-label">EEOC Status</div><div class="metric-val fail" style="font-size:1rem">❌ VIOLATION</div></div>
+        </div>
+      </div>
+      <div class="ba-arrow">→</div>
+      <div class="after-col">
+        <div class="ba-label">AFTER FIX</div>
+        <div class="metrics-grid" style="grid-template-columns:1fr">
+          <div class="metric-card"><div class="metric-label">Disparate Impact</div><div class="metric-val pass">${fixed.disparate_impact.toFixed(3)}</div></div>
+          <div class="metric-card"><div class="metric-label">DP Gap</div><div class="metric-val pass">${(fixed.demographic_parity_diff*100).toFixed(1)}%</div></div>
+          <div class="metric-card"><div class="metric-label">EEOC Status</div><div class="metric-val pass" style="font-size:1rem">${improvement.eeoc_compliant?'✅ COMPLIANT':'⚠️ IMPROVING'}</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="chart-box">
+      <div class="chart-title">Selection Rates: Before vs After Debiasing</div>
+      <canvas id="fixedChart" height="100"></canvas>
+    </div>
+
+    ${aiExp?`<div class="ai-box"><p>${aiExp}</p></div>`:''}
+  `;
+
+  container.classList.remove('hidden');
+
+  const groups = Object.keys(fixedStats);
+  const origStats = state.analysis.group_stats;
+  new Chart(document.getElementById('fixedChart').getContext('2d'), {
+    type:'bar',
+    data:{ labels:groups, datasets:[
+      { label:'After Fix (%)', data:groups.map(g=>+(fixedStats[g].selection_rate*100).toFixed(2)), backgroundColor:'rgba(0,230,118,0.75)', borderColor:'rgba(0,230,118,1)', borderWidth:1, borderRadius:6 },
+      { label:'Before Fix (%)', data:groups.map(g=>(+((origStats[g]?.selection_rate||0)*100).toFixed(2))), backgroundColor:'rgba(255,51,102,0.35)', borderColor:'rgba(255,51,102,0.7)', borderWidth:1, borderRadius:6 }
+    ]},
+    options:{ responsive:true, animation:{duration:900,easing:'easeOutQuart'},
+      plugins:{ legend:{labels:{color:'#5a6178',font:{family:'JetBrains Mono',size:10},boxWidth:14}}, tooltip:{backgroundColor:'#0c0f1a',borderColor:'rgba(255,255,255,0.1)',borderWidth:1,titleColor:'#e2e8f8',bodyColor:'#8892aa'} },
+      scales:{ x:{ticks:{color:'#5a6178',font:{family:'JetBrains Mono',size:10}},grid:{color:'rgba(255,255,255,0.03)'}}, y:{ticks:{color:'#5a6178',font:{family:'JetBrains Mono',size:10},callback:v=>v+'%'},grid:{color:'rgba(255,255,255,0.03)'}} }
+    }
+  });
+
+  setTimeout(() => document.getElementById('fixPanel').scrollIntoView({behavior:'smooth'}), 100);
+}
+
+// ── REPORT ──
+async function generateReport() {
+  const loadEl = document.getElementById('reportLoading');
+  loadEl.classList.remove('hidden');
+  try {
+    const res = await fetch(`${API}/api/report`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({ session_id:state.sessionId, org_name:document.getElementById('orgName').value||'Your Organization', auditor_name:document.getElementById('auditorName').value||'FairLens AI System' })
+    });
+    if (!res.ok) { const e = await res.json(); throw new Error(e.message||e.detail); }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href=url; a.download=`fairlens_audit_${state.sessionId}.pdf`; a.click();
+    URL.revokeObjectURL(url);
+    toast('PDF report downloaded ✓', 'success');
+  } catch(e) { toast(`Report failed: ${e.message}`, 'error'); }
+  finally { loadEl.classList.add('hidden'); }
+}
+
+// ── RESET ──
+function resetAll() {
+  Object.assign(state, {sessionId:null,columns:[],targetCol:null,sensitiveCol:null,positiveOutcome:null,analysis:null,fixed:null});
+  ['configPanel','resultsPanel','fixPanel','reportPanel'].forEach(id => document.getElementById(id).classList.add('hidden'));
+  document.getElementById('uploadPanel').classList.remove('hidden');
+  document.getElementById('featuresSection').style.display = '';
+  document.getElementById('fixResults').classList.add('hidden');
+  resetUploadZone(); setStep(1);
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+function resetUploadZone() {
+  document.getElementById('uploadZone').innerHTML = `
+    <input type="file" id="fileInput" accept=".csv">
+    <div class="upload-icon-wrap">📊</div>
+    <h3>Drop your CSV dataset here</h3>
+    <p>Drag &amp; drop or click to browse<br>Hiring, lending, healthcare, education — any domain</p>
+    <button class="demo-btn" id="demoBtn">▶ Load Demo Dataset (Hiring Bias)</button>`;
+  document.getElementById('fileInput').addEventListener('change', e => { if(e.target.files[0]) handleFile(e.target.files[0]); });
+  document.getElementById('demoBtn').addEventListener('click', e => { e.stopPropagation(); loadDemo(); });
+  document.getElementById('analyzeBtn').disabled = true;
+  document.getElementById('outcomeRow').style.display = 'none';
+}
+</script>
+</body>
+</html>

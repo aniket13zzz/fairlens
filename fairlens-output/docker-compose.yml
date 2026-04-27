@@ -1,0 +1,44 @@
+version: '3.8'
+
+services:
+  fairlens:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - SESSION_BACKEND=${SESSION_BACKEND:-redis}
+      - REDIS_URL=redis://redis:6379
+      - SESSION_TTL_SECONDS=${SESSION_TTL_SECONDS:-3600}
+      - MAX_UPLOAD_BYTES=${MAX_UPLOAD_BYTES:-10485760}
+      - MAX_DATASET_ROWS=${MAX_DATASET_ROWS:-500000}
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-*}
+    depends_on:
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./sample_data:/app/sample_data
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+
+  # Optional: Nginx reverse proxy
+  # nginx:
+  #   image: nginx:alpine
+  #   ports:
+  #     - "80:80"
+  #   volumes:
+  #     - ./nginx.conf:/etc/nginx/nginx.conf
+  #   depends_on:
+  #     - fairlens
